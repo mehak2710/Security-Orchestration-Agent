@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    env_file: .env
+    environment:
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook/soar-incident
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./policy.yaml:/app/policy.yaml
+    ports: ["8000:8000"]
+  dashboard:
+    build: .
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    environment:
+      - API_URL=http://api:8000
+    ports: ["8501:8501"]
+    depends_on: [api]
+  n8n:
+    image: n8nio/n8n
+    ports: ["5678:5678"]
+    environment:
+      - GENERIC_TIMEZONE=UTC
+      # Telegram "send and wait" needs a public URL (e.g. ngrok/cloudflared tunnel):
+      - WEBHOOK_URL=${N8N_PUBLIC_URL:-http://localhost:5678}/
+    volumes:
+      - n8n_data:/home/node/.n8n
+volumes:
+  n8n_data:

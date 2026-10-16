@@ -1,0 +1,13 @@
+malicious_threshold: 0.5          # binary gate
+destructive_actions: [block_ip, quarantine_host, disable_account]
+downgrade:                        # low-confidence AND high-impact destructive actions get downgraded
+  min_confidence: 0.80
+  impact_threshold: 50
+families:                         # weight = base severity (0-1)
+  DoS:          {weight: 0.70, action: block_ip,        ttl_minutes: 5, downgrade_to: rate_limit}
+  DDoS:         {weight: 0.90, action: block_ip,        ttl_minutes: 5, downgrade_to: rate_limit}
+  PortScan:     {weight: 0.35, action: rate_limit,      ttl_minutes: 5, downgrade_to: rate_limit}
+  BruteForce:   {weight: 0.75, action: disable_account, ttl_minutes: 5, downgrade_to: rate_limit}
+  WebAttack:    {weight: 0.80, action: block_ip,        ttl_minutes: 5, downgrade_to: rate_limit}
+  Botnet:       {weight: 0.85, action: quarantine_host, ttl_minutes: 5, downgrade_to: rate_limit}
+  Infiltration: {weight: 1.00, action: quarantine_host, ttl_minutes: 5, downgrade_to: rate_limit}

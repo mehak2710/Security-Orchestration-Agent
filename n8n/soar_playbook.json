@@ -1,0 +1,445 @@
+{
+  "name": "SOAR playbook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "soar-incident",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "soar-incident"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String($json.body.requires_approval).trim().toLowerCase() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "name": "Needs approval?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C6PMNHN0J",
+          "mode": "id"
+        },
+        "message": "={{ '🚨 GATE 1 - approve ' + $('Webhook').first().json.body.final_action + ' on ' + $('Webhook').first().json.body.target + '\\nIncident #' + $('Webhook').first().json.body.incident_id + ' | ' + $('Webhook').first().json.body.family + ' (' + $('Webhook').first().json.body.confidence + ') | ' + $('Webhook').first().json.body.severity + '\\n' + $('Webhook').first().json.body.blast_summary + '\\n\\n' + $('Webhook').first().json.body.explanation }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approve",
+            "disapproveLabel": "❌ Reject"
+          }
+        },
+        "options": {}
+      },
+      "name": "Slack Gate 1 - approve action",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        440,
+        100
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String($json.data.approved).trim().toLowerCase() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "name": "Gate 1 approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/incidents/' + $('Webhook').first().json.body.incident_id + '/execute' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({approved_by: $('Webhook').first().json.body.requires_approval ? \"slack-gate-1\" : null}) }}"
+      },
+      "name": "Execute action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/incidents/' + $('Webhook').first().json.body.incident_id + '/reject' }}"
+      },
+      "name": "Reject incident",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String($('Webhook').first().json.body.requires_approval).trim().toLowerCase() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "name": "Needs gate 2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendAndWait",
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0C6PMNHN0J",
+          "mode": "id"
+        },
+        "message": "={{ '⏱️ GATE 2 - ' + $('Webhook').first().json.body.final_action + ' on ' + $('Webhook').first().json.body.target + ' is ACTIVE for ' + $('Webhook').first().json.body.ttl_minutes + ' min (incident #' + $('Webhook').first().json.body.incident_id + '). Approve to KEEP it; otherwise it rolls back automatically.\\n' + $('Webhook').first().json.body.blast_summary }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approve",
+            "disapproveLabel": "❌ Reject"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": "={{ $('Webhook').first().json.body.ttl_minutes }}",
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "name": "Slack Gate 2 - keep action?",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        1320,
+        100
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2,
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ String($json.data.approved).trim().toLowerCase() }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {},
+        "looseTypeValidation": true
+      },
+      "name": "Gate 2 approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/incidents/' + $('Webhook').first().json.body.incident_id + '/confirm' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"approved_by\":\"slack-gate-2\"}"
+      },
+      "name": "Confirm action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://host.docker.internal:8000/incidents/' + $('Webhook').first().json.body.incident_id + '/rollback' }}"
+      },
+      "name": "Rollback action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "Every minute",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8000/sweep"
+      },
+      "name": "TTL sweeper (rollback expired)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Needs approval?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs approval?": {
+      "main": [
+        [
+          {
+            "node": "Slack Gate 1 - approve action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack Gate 1 - approve action": {
+      "main": [
+        [
+          {
+            "node": "Gate 1 approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate 1 approved?": {
+      "main": [
+        [
+          {
+            "node": "Execute action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute action": {
+      "main": [
+        [
+          {
+            "node": "Needs gate 2?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs gate 2?": {
+      "main": [
+        [
+          {
+            "node": "Slack Gate 2 - keep action?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Slack Gate 2 - keep action?": {
+      "main": [
+        [
+          {
+            "node": "Gate 2 approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate 2 approved?": {
+      "main": [
+        [
+          {
+            "node": "Confirm action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rollback action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Every minute": {
+      "main": [
+        [
+          {
+            "node": "TTL sweeper (rollback expired)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
